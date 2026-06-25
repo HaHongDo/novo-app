@@ -1,5 +1,9 @@
 import Image from 'next/image';
-import React, { useState, useContext } from 'react';
+import React, {
+  useState,
+  useContext,
+  useEffect,
+} from 'react';
 import { useRouter } from 'next/router';
 import { UserContext } from '../../context/user-Context';
 import {
@@ -15,15 +19,20 @@ import WEB_CONSTANTS from '../../utilities/constants';
 import uploadImages from '../../utilities/upload-Images';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import ScrollButton from '../../utilities/scrollButton';
 export default function OauthComplete() {
-  const { update } = useContext(UserContext);
+  const { update, userInfo } = useContext(UserContext);
   const router = useRouter();
   const server = WEB_CONSTANTS.SERVER;
   const [formData, setFormData] = useState({
     username: '',
   });
   const [userAvatar, setUserAvatar] = useState({});
-
+  useEffect(() => {
+    if (userInfo && userInfo.role !== 'oauth_incomplete') {
+      router.replace('/');
+    }
+  }, []);
   const {
     register,
     handleSubmit,
@@ -43,7 +52,8 @@ export default function OauthComplete() {
           position: toast.POSITION.BOTTOM_LEFT,
           autoClose: 3000,
         });
-        router.push('/');
+        // console.log(res);
+        router.replace('/');
       })
       .catch((err) => {
         refreshToken(true);
@@ -59,7 +69,6 @@ export default function OauthComplete() {
       id: 0,
     };
     setUserAvatar(preview);
-    console.log(file);
     uploadImages('user-avatar', file, (res) => {
       if (res) {
         preview.id = res.id;
@@ -81,7 +90,12 @@ export default function OauthComplete() {
         borderRadius: '5px',
       }}
     >
-      <form className="p-3" onSubmit={handleSubmit(submit)}>
+      <form
+        className="p-3"
+        onSubmit={() => {
+          handleSubmit(submit());
+        }}
+      >
         <div className="mb-3 mt-3">
           <label htmlFor="username" className="form-label">
             *Tên người dùng
@@ -180,3 +194,4 @@ export default function OauthComplete() {
     </div>
   );
 }
+1;

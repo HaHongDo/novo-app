@@ -1,13 +1,11 @@
-import { useContext, useState, useEffect } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { MangaContext } from '../../context/manga-Context';
 import { UserContext } from '../../context/user-Context';
 import NULL_CONSTANTS from '../../utilities/null-Constants';
-import DisplayImg from '../../components/display-Img/display-Img';
 import WEB_CONSTANTS from '../../utilities/constants';
 import ReactPaginate from 'react-paginate';
 import Image from 'next/image';
-import axios from 'axios';
 import { useForm } from 'react-hook-form';
 import {
   FaBookReader,
@@ -19,15 +17,15 @@ import {
   FaRegEdit,
   FaWindowClose,
 } from 'react-icons/fa';
-import {
-  fetchAuth,
-  refreshToken,
-} from '../../utilities/fetchAuth';
+import { fetchAuth } from '../../utilities/fetchAuth';
+import styles from './[id].module.css';
 import { toast } from 'react-toastify';
 import { useRouter } from 'next/router';
 import RelativeTimestamp from '../../utilities/to-Relative-Time-stamp';
 import { BiLike } from 'react-icons/bi';
 import uploadImages from '../../utilities/upload-Images';
+import ScrollButton from '../../utilities/scrollButton';
+
 export async function getServerSideProps(context) {
   const server = WEB_CONSTANTS.SERVER;
   const { params } = context;
@@ -52,7 +50,7 @@ export default function User({ user, id }) {
 
   const { userInfo } = useContext(UserContext);
   const [userAvatar, setUserAvatar] = useState({});
-
+  const [role, setRole] = useState(userInfo.role);
   const [pageNumber, setPageNumber] = useState(0);
   const bookPerPage = 4;
   const pageVisited = pageNumber * bookPerPage;
@@ -223,7 +221,19 @@ export default function User({ user, id }) {
   const changePage = ({ selected }) => {
     setPageNumber(selected);
   };
-
+  const setRoleforUser = () => {
+    fetchAuth({
+      url: `${server}/auth/role`,
+      method: 'PATCH',
+      data: { userId: parseInt(id), role: role },
+    }).then(() => {
+      toast('Chỉnh sửa thành công', {
+        position: 'bottom-left',
+        autoClose: 2000,
+      });
+      router.replace(router.asPath);
+    });
+  };
   return (
     <div>
       <div
@@ -254,25 +264,38 @@ export default function User({ user, id }) {
                 layout="fill"
                 objectFit="cover"
                 alt=""
-              ></Image>
+              />
             </div>
           </div>
           <div className="col-lg-8 col-12 ps-5 pt-2">
             <div className="d-flex justify-content-start">
               <h3>{user.name}</h3>
-              <p
-                className="ms-2 mt-2"
-                style={{
-                  border: '1px solid #1abc9c',
-                  padding: '0.25rem',
-                  borderRadius: '0.75rem',
-                  color: '#1abc9c',
-                  fontWeight: 'bold',
-                  fontSize: '0.75rem',
-                }}
-              >
-                {user.role}
-              </p>
+              <div className={styles.item}>
+                <button
+                  className="ms-2 mt-2 btn"
+                  data-bs-toggle="modal"
+                  data-bs-target="#setRole"
+                  style={{
+                    border: '1px solid',
+                    borderColor:
+                      userInfo.role !== 'banned'
+                        ? '#1abc9c'
+                        : '#c0392b',
+                    padding: '0.25rem',
+                    borderRadius: '0.75rem',
+                    color:
+                      userInfo.role !== 'banned'
+                        ? '#1abc9c'
+                        : '#c0392b',
+                    fontWeight: 'bold',
+                    fontSize: '0.75rem',
+                  }}
+                  disabled={userInfo.role !== 'admin'}
+                >
+                  {user.role}
+                </button>
+              </div>
+
               {userInfo.id == id && (
                 <button
                   className="btn btn-light mb-3 ms-3"
@@ -481,6 +504,7 @@ export default function User({ user, id }) {
                     type="file"
                     className="form-control"
                     onChange={handlePreviewAvatar}
+                    accept="image/*"
                   />
                   <div className="mt-3 d-flex justify-content-center">
                     <div
@@ -496,7 +520,9 @@ export default function User({ user, id }) {
                         src={
                           userAvatar.fileURL
                             ? userAvatar.fileURL
-                            : `${server}/image/${user.avatar}`
+                            : user.avatar
+                            ? `${server}/image/${user.avatar}`
+                            : NULL_CONSTANTS.AVATAR
                         }
                         alt="author Avatar"
                         objectFit="cover"
@@ -530,6 +556,54 @@ export default function User({ user, id }) {
           </div>
         </div>
       </div>
+      <div
+        className="modal fade"
+        id="setRole"
+        aria-labelledby="setRole"
+        aria-hidden="true"
+      >
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h5 className="modal-title" id="setRole">
+                Cài đặt phân quyền
+              </h5>
+              <button
+                type="button"
+                className="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              ></button>
+            </div>
+            <div className="modal-body">
+              <label className="form-label mb-3">
+                Chọn phân quyền
+              </label>
+              <select
+                className="form-select"
+                onChange={(e) => {
+                  setRole(e.target.value);
+                }}
+              >
+                <option>member</option>
+                <option>moderator</option>
+                <option>banned</option>
+              </select>
+
+              <div className="d-flex justify-content-center mt-3">
+                <button
+                  className="btn btn-dark"
+                  data-bs-dismiss="modal"
+                  onClick={() => setRoleforUser()}
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <ScrollButton></ScrollButton>
     </div>
   );
 }

@@ -1,24 +1,25 @@
 import React, {
-  useState,
-  useEffect,
   useContext,
+  useEffect,
+  useState,
 } from 'react';
 import {
+  arrayMove,
   SortableContainer,
   SortableElement,
 } from 'react-sortable-hoc';
 import { MangaContext } from '../../context/manga-Context';
 import { UserContext } from '../../context/user-Context';
-import { arrayMove } from 'react-sortable-hoc';
 import uploadImages from '../../utilities/upload-Images';
 import NULL_CONSTANTS from '../../utilities/null-Constants';
 import Image from 'next/image';
 import TagInput from '../../components/upload-Manga/reactTag';
-import Tags from '@yaireo/tagify/dist/react.tagify';
 import { fetchAuth } from '../../utilities/fetchAuth';
 import { useRouter } from 'next/router';
-import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
+import { FaAngry } from 'react-icons/fa';
+import ScrollButton from '../../utilities/scrollButton';
+
 export default function UploadManga() {
   const { server } = useContext(MangaContext);
   const { listAuthorsId } = useContext(UserContext);
@@ -169,81 +170,94 @@ export default function UploadManga() {
           : null,
       },
     }).then((res) => {
-      console.log(res);
-      toast.success(`${res}`, {
+      toast.success(`Upload thành công`, {
         position: 'bottom-left',
         autoClose: 2000,
       });
 
-      router.push(`/manage-Manga/${res.data.id}`);
+      router.replace(`/manage-Manga/${res.data.id}`);
     });
   };
   const SortableListItem = SortableElement(
     ({ image, stt }) => {
-      console.log(image);
-
       return (
         <div>
-          {image.status === 'uploading' ? (
-            <div className="spinner-border"></div>
-          ) : image.status === 'failed' ? (
+          <div>
             <div
+              className="card m-3"
               style={{
-                width: '100px',
                 aspectRatio: '3/4',
+                width: '150px',
               }}
             >
               <Image
-                width={100}
-                height={100}
+                src={image.fileURL}
+                objectFit="cover"
                 layout="responsive"
-                src={
-                  'https://upload.wikimedia.org/wikipedia/commons/thumb/9/99/Crystal_128_error.svg/1024px-Crystal_128_error.svg.png'
-                }
+                width={'150'}
+                height={'200'}
                 alt=""
-              ></Image>
-            </div>
-          ) : (
-            <div>
+              />
+              {image.status === 'uploading' ||
+                (image.status === 'failed' && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      zIndex: '20',
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      background: '#00000038',
+                    }}
+                  >
+                    {image.status === 'uploading' ? (
+                      <div
+                        className="spinner-border text-light"
+                        role="status"
+                      >
+                        <span className="visually-hidden">
+                          Loading...
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="m-2">
+                        <button className="btn btn-danger">
+                          <FaAngry />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
               <div
-                className="card m-3"
+                className="card-img-overlay"
                 style={{
-                  aspectRatio: '3/4',
-                  width: '150px',
+                  zIndex: '21',
                 }}
               >
-                <Image
-                  src={image.fileURL}
-                  objectFit="cover"
-                  layout="responsive"
-                  width={'150'}
-                  height={'200'}
-                  alt=""
-                />
-                <div className="card-img-overlay">
-                  <div className="d-flex justify-content-between mt-1">
-                    <p className="card-title">
-                      <span className="badge bg-primary">
-                        {stt + 1}
-                      </span>
-                    </p>
-                    <div>
-                      <button
-                        className="btn btn-danger"
-                        onClick={() => {
-                          let updated = [...images];
-                          updated.splice(stt, 1);
-                          setImages(updated);
-                        }}
-                      >
-                        X
-                      </button>
-                    </div>
+                <div className="d-flex justify-content-between mt-1">
+                  <p className="card-title">
+                    <span className="badge bg-primary">
+                      {stt + 1}
+                    </span>
+                  </p>
+                  <div>
+                    <button
+                      className="btn btn-danger"
+                      onClick={() => {
+                        let updated = [...images];
+                        updated.splice(stt, 1);
+                        setImages(updated);
+                      }}
+                    >
+                      X
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
-          )}
+          </div>
         </div>
       );
     }
@@ -274,7 +288,8 @@ export default function UploadManga() {
       className="offset-md-2 col-lg-8 col-12 mt-5"
       style={{
         background: '#f3f3f3',
-        borderRadius: '5px',
+        borderRadius: '0.75rem',
+        boxShadow: 'rgba(0, 0, 0, 0.35) 0px 5px 15px',
       }}
     >
       <h3 className="d-flex justify-content-center mt-3">
@@ -331,7 +346,6 @@ export default function UploadManga() {
                       alias: e.target.value,
                     })
                   }
-                  required
                 />
                 <label
                   htmlFor=""
@@ -362,7 +376,7 @@ export default function UploadManga() {
                     data-bs-toggle="modal"
                     data-bs-target="#addAuthor"
                   >
-                    Thêm tác giả mới
+                    Tạo tác giả mới
                   </button>
                 </div>
               </div>
@@ -382,8 +396,12 @@ export default function UploadManga() {
                   checked={genre.checked}
                   onChange={handleCheckbox}
                   value={index}
+                  name={genre.name}
                 />
-                <label className="form-check-label">
+                <label
+                  className="form-check-label"
+                  name={genre.name}
+                >
                   {genre.name}
                 </label>
               </div>
@@ -421,6 +439,7 @@ export default function UploadManga() {
                 id="mangaCover"
                 multiple
                 onChange={handlePreviewCover}
+                accept="image/*"
               />
 
               <div className="row mt-3">
@@ -579,6 +598,7 @@ export default function UploadManga() {
                     type="file"
                     className="form-control"
                     onChange={handlePreviewAvatar}
+                    accept="image/*"
                   />
                   <div className="mt-3 d-flex justify-content-center">
                     <div
@@ -616,6 +636,7 @@ export default function UploadManga() {
           </div>
         </div>
       </div>
+      <ScrollButton></ScrollButton>
     </div>
   );
 }

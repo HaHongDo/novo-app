@@ -16,6 +16,8 @@ import {
   validToken,
 } from '../../utilities/fetchAuth';
 import UserLogin from '../user-Login/user-Login';
+import { toast } from 'react-toastify';
+
 export default function Layout({ children }) {
   const { genres } = useContext(MangaContext);
   const { update, userInfo } = useContext(UserContext);
@@ -45,6 +47,10 @@ export default function Layout({ children }) {
                   })
                 ).data
               );
+              toast.success('Đăng nhập thành công', {
+                position: 'bottom-left',
+                autoClose: 3000,
+              });
             }
           })();
           break;
@@ -66,7 +72,10 @@ export default function Layout({ children }) {
     <div>
       <Head>
         <title>MangaReader</title>
-
+        <link
+          href="https://fonts.googleapis.com/css2?family=Lora&family=Poppins:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap"
+          rel="stylesheet"
+        />
         <meta
           name="viewport"
           content="initial-scale=1.0, width=device-width"
@@ -75,21 +84,23 @@ export default function Layout({ children }) {
       <nav className="navbar navbar-expand-sm navbar-dark bg-dark sticky-top ">
         <div className="container">
           <Link href="/" passHref>
-            <div
-              className="navbar-brand"
-              style={{
-                width: '80px',
-                aspectRatio: '4/3',
-                overflow: 'hidden',
-                position: 'relative',
-              }}
-            >
-              <Image
-                src={'/images/logoWhite.png'}
-                alt="logo"
-                layout="fill"
-                objectFit="cover"
-              ></Image>
+            <div className="navbar-brand">
+              <div
+                className={styles.differentitem}
+                style={{
+                  position: 'relative',
+                  overflow: 'hidden',
+                  width: '100px',
+                  aspectRatio: '2/1',
+                }}
+              >
+                <Image
+                  src="/images/logo.png"
+                  alt="logo"
+                  layout="fill"
+                  objectFit="contain"
+                ></Image>
+              </div>
             </div>
           </Link>
 
@@ -108,7 +119,7 @@ export default function Layout({ children }) {
             className="collapse navbar-collapse"
             id="navbarSupportedContent"
           >
-            <ul className="navbar-nav me-auto mb-2 mb-lg-0">
+            <ul className="navbar-nav me-auto ">
               <li className="nav-item dropdown">
                 <a
                   className="nav-link dropdown-toggle"
@@ -117,7 +128,7 @@ export default function Layout({ children }) {
                   data-bs-toggle="dropdown"
                   aria-expanded="false"
                 >
-                  Danh sách
+                  Thể loại
                 </a>
                 <ul
                   className="dropdown-menu"
@@ -131,14 +142,16 @@ export default function Layout({ children }) {
                             className={`col-2 col-lg-3`}
                             key={genre.id}
                           >
-                            <Link
-                              href={`/genre/${genre.id}`}
-                              passHref
-                            >
-                              <p className={styles.item}>
-                                {genre.name}
-                              </p>
-                            </Link>
+                            <div className="d-flex justify-content-center p-1">
+                              <Link
+                                href={`/genre/${genre.id}`}
+                                passHref
+                              >
+                                <p className={styles.item}>
+                                  {genre.name}
+                                </p>
+                              </Link>
+                            </div>
                           </div>
                         ))}
                     </div>
@@ -151,26 +164,27 @@ export default function Layout({ children }) {
                 </Link>
               </li>
             </ul>
+
+            <SearchBar></SearchBar>
             <Link href="/upload-Manga/upload-Manga">
               {Object.keys(userInfo).length !== 0 ? (
-                <button className="nav-item btn btn-light me-2">
-                  Upload truyện
+                <button className="nav-item btn btn-light m-2">
+                  Thêm truyện mới
                 </button>
               ) : (
                 ''
               )}
             </Link>
-
-            <SearchBar></SearchBar>
             {userInfo && Object.keys(userInfo).length ? ( //nếu đã đăng nhập thì hiện 1 cái offcanvas
               <div
-                className=" ms-2"
+                className=" m-2"
                 style={{
                   overflow: 'hidden',
                   borderRadius: '50%',
                   background: 'white',
                   width: '50px',
                   height: '50px',
+                  position: 'relative',
                 }}
                 data-bs-toggle="offcanvas"
                 data-bs-target="#demo"
@@ -182,15 +196,13 @@ export default function Layout({ children }) {
                       : NULL_CONSTANTS.AVATAR
                   }
                   alt=""
-                  width="50"
-                  height="50"
-                  layout="responsive"
+                  layout="fill"
                   objectFit="cover"
                 />
               </div>
             ) : (
               <div
-                className=" ms-2"
+                className=" m-2"
                 style={{
                   overflow: 'hidden',
                   borderRadius: '50%',

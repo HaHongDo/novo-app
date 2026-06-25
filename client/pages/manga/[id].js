@@ -1,6 +1,6 @@
 import DisplayImg from '../../components/display-Img/display-Img';
 import Link from 'next/link';
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { MangaContext } from '../../context/manga-Context';
 import ReactPaginate from 'react-paginate';
 import { UserContext } from '../../context/user-Context';
@@ -12,32 +12,44 @@ import {
   FaEye,
   FaHeart,
   FaNewspaper,
+  FaRegStar,
   FaTags,
   FaUser,
   FaWifi,
   FaWindowClose,
 } from 'react-icons/fa';
-import { BiDislike, BiLike } from 'react-icons/bi';
+import Switch from 'react-switch';
+
+import { BiDislike, BiLike, BiTime } from 'react-icons/bi';
 import ByWeek from '../../components/ranking-In-Manga-Page/by-Week';
 import ByMonth from '../../components/ranking-In-Manga-Page/by-Month';
 import ByYear from '../../components/ranking-In-Manga-Page/by-Year';
 import Image from 'next/image';
 import RelativeTimestamp from '../../utilities/to-Relative-Time-stamp';
-import {
-  fetchAuth,
-  refreshToken,
-} from '../../utilities/fetchAuth';
+import { fetchAuth } from '../../utilities/fetchAuth';
 import Router, { useRouter } from 'next/router';
 import { toast } from 'react-toastify';
+import ScrollButton from '../../utilities/scrollButton';
 import {
-  addToHistory,
   addToFavorite,
+  addToHistory,
+  removeElementFavorite,
 } from '../../utilities/localStorageFunction';
+
 export async function getServerSideProps(context) {
   const server = WEB_CONSTANTS.SERVER;
   const { params } = context;
   const { id } = params;
-  const response = await fetch(`${server}/book/${id}`);
+  const response = await fetch(
+    `${server}/book/${id}`
+  ).catch((err) => {
+    toast.error('Có lỗi xảy ra! Vui lòng thử lại sau', {
+      position: 'bottom-left',
+      autoClose: 3000,
+    });
+    Router.replace('/');
+    removeElementFavorite(id);
+  });
   const data = await response.json();
   const responseComment = await fetch(
     `${server}/comment/?bookGroupId=${id}`
@@ -58,11 +70,18 @@ export default function Details({
   comments,
   bookGroupId,
 }) {
+  const [arr, setArr] = useState([]);
   const { userInfo } = useContext(UserContext);
   const [pageNumber, setPageNumber] = useState(0);
   const cmtPerPage = 5;
   const pageVisited = pageNumber * cmtPerPage;
+  const [isFilterByUser, setFilterByUser] = useState(false);
+  useEffect(() => {
+    let arr =
+      JSON.parse(localStorage.getItem('favorite')) ?? [];
 
+    setArr(arr.filter((book) => book.id == bookGroupId));
+  }, []);
   const [comment, setComment] = useState('');
   const router = useRouter();
   const { server, randomBooks } = useContext(MangaContext);
@@ -71,6 +90,10 @@ export default function Details({
     : 0;
   const changePage = ({ selected }) => {
     setPageNumber(selected);
+  };
+
+  const handleChange = (checked) => {
+    setFilterByUser(checked);
   };
   const [likeState, setLikeState] = useState('unlike');
   function likeOperation(likeState) {
@@ -83,6 +106,9 @@ export default function Details({
       },
     });
   }
+  const handleInputChange = (text) => {
+    setComment(text);
+  };
 
   const actualLikeCount =
     manga.likeCount + (likeState === 'like' ? 1 : 0);
@@ -109,12 +135,17 @@ export default function Details({
     setCurrentEditedCommentContent,
   ] = useState('');
 
-  const submit = (text) => {
+  const [
+    initialEditedCommentContent,
+    setInitialEditedCommentContent,
+  ] = useState('');
+
+  const submit = () => {
     fetchAuth({
       url: `${server}/auth/comment?bookGroupId=${bookGroupId}`,
       method: `POST`,
       data: {
-        comment: text,
+        comment: comment,
       },
     })
       .then((res) => {
@@ -124,9 +155,7 @@ export default function Details({
         });
         setComment('');
 
-        router.replace(
-          `/manga/${bookGroupId}#comment-section`
-        );
+        router.replace(router.asPath);
       })
       .catch((err) => {
         toast.error(
@@ -138,7 +167,36 @@ export default function Details({
         );
       });
   };
+  const deleteBookGroup = () => {
+    fetchAuth({
+      url: `${server}/auth/book/${bookGroupId}`,
+      method: 'DELETE',
+    }).then(() => {
+      toast.success('Xoá thành công', {
+        position: 'bottom-left',
+        autoClose: 2000,
+      });
+      if (arr.length > 0) {
+        removeElementFavorite(bookGroupId);
+      }
+      let data = JSON.parse(
+        localStorage.getItem('history')
+      );
 
+      if (data) {
+        data.forEach((item, index) => {
+          if (bookGroupId == item.id) {
+            data.splice(index, 1);
+          }
+        });
+        localStorage.setItem(
+          'history',
+          JSON.stringify(data)
+        );
+      }
+      router.replace('/');
+    });
+  };
   const deleteComment = (id) => {
     fetchAuth({
       url: `${server}/auth/comment/${id}`,
@@ -151,64 +209,186 @@ export default function Details({
       router.push('/manga/' + bookGroupId);
     });
   };
+  const deleteChapter = (id) => {
+    fetchAuth({
+      url: `${server}/auth/chapter/${id}`,
+      method: 'DELETE',
+    }).then(() => {
+      toast.success('Xoá thành công', {
+        position: 'bottom-left',
+        autoClose: 3000,
+      });
+      router.replace(`/manga/${bookGroupId}`);
+    });
+  };
 
   const displayDatas = comments ? (
     comments
       .slice(pageVisited, pageVisited + cmtPerPage)
       .map((comment, index) => (
         <div className="row mb-3" key={index}>
-          <div className="col-lg-2 col-2 ">
+          <div className="col-lg-2 col-3 ">
             <div
               style={{
                 borderRadius: '50%',
-                width: '70%',
+                width: '80%',
                 overflow: 'hidden',
                 position: 'relative',
                 aspectRatio: '1/1',
               }}
             >
-              <Image
-                src={
-                  comment.userAvatar
-                    ? `${server}/image/${comment.userAvatar}`
-                    : NULL_CONSTANTS.AVATAR
-                }
-                alt=""
-                layout="fill"
-              />
+              <Link
+                href={'/user/' + comment.userId}
+                passHref
+              >
+                <Image
+                  src={
+                    comment.userAvatar
+                      ? `${server}/image/${comment.userAvatar}`
+                      : NULL_CONSTANTS.AVATAR
+                  }
+                  alt=""
+                  layout="fill"
+                />
+              </Link>
             </div>
           </div>
           <div
-            className="col-8"
+            className="col-lg-10 col-9"
             style={{
               border: '1px solid #bdc3c7',
               borderRadius: '10px',
               background: '#ecf0f1',
-              display: 'flex',
             }}
           >
             <div>
-              <p
-                className={
-                  'display-6 text-primary ' + styles.object
-                }
-                style={{ fontSize: '20px' }}
-              >
-                {comment.userName}
-                <span
-                  style={{
-                    fontSize: '12px',
-                    color: 'black',
-                  }}
-                >
-                  {' '}
-                  <RelativeTimestamp>
-                    {comment.timePosted}
-                  </RelativeTimestamp>
-                </span>
-              </p>
+              <div className="d-flex">
+                <div>
+                  <Link
+                    href={'/user/' + comment.userId}
+                    passHref
+                  >
+                    <p
+                      className={
+                        'display-6 text-primary  ' +
+                        styles.object
+                      }
+                      style={{ fontSize: '20px' }}
+                    >
+                      {comment.userName}
+                    </p>
+                  </Link>
+                </div>
+                <div>
+                  <span
+                    className="ms-3"
+                    style={{
+                      fontSize: '12px',
+                      color: 'black',
+                    }}
+                  >
+                    <BiTime />
+                    <RelativeTimestamp>
+                      {comment.timePosted}
+                    </RelativeTimestamp>
+                  </span>
+                </div>
+                <div className={styles.object}>
+                  <Link
+                    href={'/chapter/' + comment.chapterId}
+                    passHref
+                  >
+                    <p className="ms-2">
+                      {comment.chapterNumber
+                        ? 'Chap ' + comment.chapterNumber
+                        : ''}
+                    </p>
+                  </Link>
+                </div>
+                {console.log(
+                  currentEditedComment,
+                  userInfo.permission
+                )}
+                {currentEditedComment !== index && (
+                  <div>
+                    {userInfo.id === comment.userId &&
+                    Array.isArray(userInfo.permission) &&
+                    userInfo.permission.includes(
+                      'comment.modifySelf'
+                    ) ? (
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          setCurrentEditedComment(index);
+                          setCurrentEditedCommentContent(
+                            comment.comment
+                          );
+                          setInitialEditedCommentContent(
+                            comment.comment
+                          );
+                        }}
+                      >
+                        <FaEdit />
+                      </button>
+                    ) : (
+                      Array.isArray(userInfo.permission) &&
+                      userInfo.permission.includes(
+                        'comment.modify'
+                      ) && (
+                        <button
+                          className="btn"
+                          onClick={() => {
+                            setCurrentEditedComment(index);
+                            setCurrentEditedCommentContent(
+                              comment.comment
+                            );
+                            setInitialEditedCommentContent(
+                              comment.comment
+                            );
+                          }}
+                        >
+                          <FaEdit />
+                        </button>
+                      )
+                    )}
+                    {Array.isArray(userInfo.permission) &&
+                    userInfo.id === comment.userId &&
+                    userInfo.permission.includes(
+                      'comment.deleteSelf'
+                    ) ? (
+                      <button
+                        className="btn"
+                        onClick={() => {
+                          deleteComment(comment.commentId);
+                        }}
+                      >
+                        <FaWindowClose />
+                      </button>
+                    ) : (
+                      Array.isArray(userInfo.permission) &&
+                      userInfo.permission.includes(
+                        'comment.delete'
+                      ) && (
+                        <button
+                          className="btn"
+                          onClick={() => {
+                            deleteComment(
+                              comment.commentId
+                            );
+                          }}
+                        >
+                          <FaWindowClose />
+                        </button>
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
+
               {currentEditedComment !== index ? (
-                <p className="m-3">{comment.comment}</p>
+                <p className="m-3 text-break">
+                  {comment.comment}
+                </p>
               ) : (
                 <div className="d-flex">
                   <input
@@ -220,10 +400,11 @@ export default function Details({
                         e.target.value
                       )
                     }
+                    placeholder="Comment phải có từ 10 tới 500 ký tự"
                   />
                   <button
-                    className="btn btn-link"
-                    onClick={() =>
+                    className="btn "
+                    onClick={() => {
                       fetchAuth({
                         url: `${server}/auth/comment/${comment.commentId}`,
                         method: 'PATCH',
@@ -231,58 +412,37 @@ export default function Details({
                           comment:
                             currentEditedCommentContent,
                         },
-                      }).then(() => {
-                        toast.success(
-                          'Sửa comment thành công',
-                          {
-                            position: 'bottom-left',
-                            autoClose: 2000,
-                          }
-                        );
-                        router.replace(
-                          `/manga/${bookGroupId}#comment-section`
-                        );
                       })
-                    }
-                  >
-                    Edit
-                  </button>
-                </div>
-              )}
-            </div>
-            <div className="d-flex">
-              {userInfo.id === comment.userId &&
-                currentEditedComment !== index &&
-                userInfo.permission &&
-                userInfo.permission.includes(
-                  'comment.modifySelf'
-                ) && (
-                  <button
-                    className="btn"
-                    onClick={() => {
-                      setCurrentEditedComment(index);
-                      setCurrentEditedCommentContent(
-                        comment.comment
-                      );
+                        .then(() => {
+                          toast.success(
+                            'Sửa comment thành công',
+                            {
+                              position: 'bottom-left',
+                              autoClose: 2000,
+                            }
+                          );
+                        })
+                        .catch(() => {
+                          toast.error(
+                            'Sửa comment thất bại! Comment phải có từ 10 tới 500 ký tự',
+                            {
+                              position: 'bottom-left',
+                              autoClose: 2000,
+                            }
+                          );
+                        });
+                      setCurrentEditedComment(-1);
+                      router.replace(router.asPath);
                     }}
+                    disabled={
+                      currentEditedCommentContent < 10 ||
+                      currentEditedCommentContent > 500
+                    }
                   >
                     <FaEdit></FaEdit>
                   </button>
-                )}
-              {userInfo.id === comment.userId &&
-                userInfo.permission &&
-                userInfo.permission.includes(
-                  'comment.deleteSelf'
-                ) && (
-                  <button
-                    className="btn"
-                    onClick={() => {
-                      deleteComment(comment.commentId);
-                    }}
-                  >
-                    <FaWindowClose></FaWindowClose>
-                  </button>
-                )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -290,13 +450,25 @@ export default function Details({
   ) : (
     <div>Không có comment nào</div>
   );
+
   const sortByChapterNumber = () => {
-    let arr = manga.chapters && manga.chapters.slice(0);
-    arr &&
+    const arr = manga.chapters && manga.chapters.slice(0);
+    if (arr) {
       arr.sort(function (a, b) {
         return b.chapterNumber - a.chapterNumber;
       });
-    manga.chapters = arr;
+      manga.chapters = arr;
+    }
+  };
+  const triggerFavorite = () => {
+    if (arr.length > 0) {
+      setArr([]);
+      removeElementFavorite(bookGroupId);
+    } else {
+      addToFavorite(bookGroupId, manga);
+
+      setArr(JSON.parse(localStorage.getItem('favorite')));
+    }
   };
   return (
     <div style={{ background: '#EBEBEB' }}>
@@ -316,12 +488,15 @@ export default function Details({
                 {manga.name}
               </h3>
               {manga.alias && (
-                <h5
-                  className="d-flex justify-content-center"
-                  style={{ fontStyle: 'italic' }}
+                <p
+                  className="d-flex justify-content-center display-6"
+                  style={{
+                    fontStyle: 'italic',
+                    fontSize: '1rem',
+                  }}
                 >
                   {manga.alias}
-                </h5>
+                </p>
               )}
             </div>
 
@@ -339,10 +514,10 @@ export default function Details({
                 ></DisplayImg>
               </div>
               <div
-                className="col-lg-6 col-12"
+                className="col-lg-7 col-12"
                 data-aos="fade-left"
               >
-                <div className="d-flex justify-content-between ">
+                <div className="d-flex justify-content-around ">
                   <div>
                     <p>
                       <FaUser></FaUser> {' ' + 'Tác giả'}
@@ -360,8 +535,12 @@ export default function Details({
                       {' Lượt đọc'}
                     </p>
                     <p>
+                      <FaRegStar></FaRegStar>
+                      {' Rating:'}
+                    </p>
+                    <p>
                       <FaTags></FaTags>
-                      {' Thể loại'}
+                      {' Thể loại:'}
                     </p>
                   </div>
                   <div>
@@ -377,9 +556,10 @@ export default function Details({
                                 <span
                                   className={styles.object}
                                   style={{
-                                    background: '#bdc3c7',
+                                    background: '#dfe6e9',
                                     borderRadius: '0.5rem',
                                     padding: '0.25rem',
+                                    fontWeight: '600',
                                     marginRight: '0.5rem',
                                   }}
                                 >
@@ -399,103 +579,154 @@ export default function Details({
                     </p>
                     <p>{manga.views}</p>
                     <p>
-                      {manga.genres &&
-                        manga.genres.map((genre) => (
-                          <Link
-                            key={genre.id}
-                            href={`/genre/${genre.id}`}
-                            passHref
-                          >
-                            <span
-                              className={styles.object}
-                              style={{
-                                background: '#bdc3c7',
-                                borderRadius: '0.5rem',
-                                padding: '0.25rem',
-                                marginRight: '0.5rem',
-                              }}
+                      {actualDislikeCount +
+                        actualLikeCount >
+                      3
+                        ? (actualLikeCount /
+                            (actualLikeCount +
+                              actualDislikeCount)) *
+                            100 +
+                          '%'
+                        : 'Đang cập nhật'}
+                    </p>
+                    <p>
+                      {manga.genres.length > 0
+                        ? manga.genres.map((genre) => (
+                            <Link
+                              key={genre.id}
+                              href={`/genre/${genre.id}`}
+                              passHref
                             >
-                              {genre.name}
-                            </span>
-                          </Link>
-                        ))}
+                              <span
+                                className={styles.object}
+                                style={{
+                                  background: '#dfe6e9',
+                                  borderRadius: '0.5rem',
+                                  padding: '0.25rem',
+                                  fontWeight: '500',
+                                  marginRight: '0.75rem',
+                                }}
+                              >
+                                {genre.name}
+                              </span>
+                            </Link>
+                          ))
+                        : 'Đang cập nhật'}
                     </p>
                   </div>
                 </div>
-                <div className="button-utilities col-12">
-                  <button
-                    disabled={
-                      Object.keys(userInfo).length === 0
-                    }
-                    type="button"
-                    onClick={() => {
-                      likeStateButton();
-                    }}
-                    className="btn btn-outline-dark  me-2"
-                  >
-                    <BiLike></BiLike>
-                    <span className="badge bg-danger">
-                      {' ' + actualLikeCount}
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    disabled={
-                      Object.keys(userInfo).length === 0
-                    }
-                    className="btn  btn-outline-dark me-2"
-                    onClick={() => {
-                      dislikeStateButton();
-                    }}
-                  >
-                    <BiDislike></BiDislike>
-                    <span className="badge bg-primary">
-                      {actualDislikeCount}
-                    </span>
-                  </button>
-                  <button className="btn" disabled>
-                    {actualDislikeCount + actualLikeCount >
-                      3 &&
-                      (actualLikeCount /
-                        (actualLikeCount +
-                          actualDislikeCount)) *
-                        100 +
-                        '%'}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-success  "
-                    onClick={() => {
-                      addToFavorite(bookGroupId, manga);
-                    }}
-                  >
-                    <FaHeart></FaHeart>
-                    {' Yêu Thích'}
-                  </button>
-
-                  {manga.chapters.length != 0 && (
-                    <Link
-                      passHref
-                      href={`/chapter/${
-                        manga.chapters[
-                          manga.chapters.length - 1
-                        ].id
-                      }`}
+                <div className="button-utilities d-flex justify-content-between">
+                  <div className=" d-flex">
+                    <button
+                      disabled={
+                        Object.keys(userInfo).length === 0
+                      }
+                      type="button"
+                      onClick={() => {
+                        likeStateButton();
+                      }}
+                      className="btn btn-outline-dark me-2 "
                     >
-                      <button
-                        type="button"
-                        className={
-                          actualDislikeCount +
-                            actualLikeCount >
-                          3
-                            ? `btn btn-dark mt-2`
-                            : `btn btn-dark ms-2`
-                        }
+                      <BiLike></BiLike>
+                      <span className="badge bg-danger ">
+                        {' ' + actualLikeCount}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={
+                        Object.keys(userInfo).length === 0
+                      }
+                      className="btn  btn-outline-dark"
+                      onClick={() => {
+                        dislikeStateButton();
+                      }}
+                    >
+                      <BiDislike></BiDislike>
+                      <span className="badge bg-primary">
+                        {actualDislikeCount}
+                      </span>
+                    </button>
+                  </div>
+                  <div className=" d-flex">
+                    {manga.chapters.length != 0 && (
+                      <Link
+                        passHref
+                        href={`/chapter/${
+                          manga.chapters[
+                            manga.chapters.length - 1
+                          ].id
+                        }`}
                       >
-                        Đọc từ đầu
+                        <button
+                          type="button"
+                          className="btn btn-dark"
+                        >
+                          Đọc từ đầu
+                        </button>
+                      </Link>
+                    )}
+
+                    <button
+                      type="button"
+                      className="btn btn-success ms-2 "
+                      onClick={() => triggerFavorite()}
+                      disabled={
+                        Object.keys(userInfo).length === 0
+                      }
+                    >
+                      <FaHeart></FaHeart>
+                      {arr.length > 0
+                        ? ' Bỏ Yêu Thích'
+                        : 'Yêu Thích'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="d-flex mt-3">
+                  {userInfo.permission &&
+                  userInfo.permission.includes(
+                    'book.modifySelf'
+                  ) &&
+                  userInfo.id == manga.ownerId ? (
+                    <Link
+                      href={'/manage-Manga/' + bookGroupId}
+                      passHref
+                    >
+                      <button className="btn btn-dark me-2">
+                        <FaEdit></FaEdit>Sửa truyện
                       </button>
                     </Link>
+                  ) : (
+                    userInfo.permission &&
+                    userInfo.permission.includes(
+                      'book.modify'
+                    ) && (
+                      <Link
+                        href={
+                          '/manage-Manga/' + bookGroupId
+                        }
+                        passHref
+                      >
+                        <button className="btn btn-dark me-2">
+                          <FaEdit></FaEdit>Sửa truyện
+                        </button>
+                      </Link>
+                    )
                   )}
+                  {userInfo.permission &&
+                    userInfo.permission.includes(
+                      'book.delete'
+                    ) && (
+                      <button
+                        className="btn btn-danger"
+                        data-bs-toggle="modal"
+                        data-bs-target="#deleteModal"
+                      >
+                        <FaWindowClose></FaWindowClose>Xoá
+                        truyện
+                      </button>
+                    )}
                 </div>
               </div>
             </div>
@@ -616,96 +847,187 @@ export default function Details({
               <p>{manga.description}</p>
             </div>
             <div className="mt-1">
-              <h5
-                style={{
-                  borderLeft: '5px solid #8e44ad',
-                  color: ' #8e44ad',
-                }}
-                className="ps-2"
-              >
-                DANH SÁCH CHAP
-              </h5>
+              <div className="d-flex justify-content-between mb-2">
+                <h5
+                  style={{
+                    borderLeft: '5px solid #8e44ad',
+                    color: ' #8e44ad',
+                  }}
+                  className="ps-2"
+                >
+                  DANH SÁCH CHAP
+                </h5>
+                {manga.chapters.filter(
+                  (chapter) =>
+                    chapter.userPosted.id == userInfo.id
+                ).length ? (
+                  <label>
+                    <span>Hiện chap bạn đăng</span>
+                    <Switch
+                      onChange={handleChange}
+                      checked={isFilterByUser}
+                    />
+                  </label>
+                ) : (
+                  ''
+                )}
+              </div>
 
               <div
                 className="row"
                 style={{ borderBottom: '1px solid grey' }}
               >
-                <div className="col-2">
-                  <p>STT</p>
+                <div className="col-4">
+                  <p>Chapter</p>
                 </div>
-                <div className="col-3">
-                  <p>Tên chap</p>
-                </div>
+
                 <div className="col-2">
                   <p>Cập nhật</p>
                 </div>
                 <div className="col-3">
                   <p>Người đăng</p>
                 </div>
-                <div className="col-2">
-                  <p>Lượt xem</p>
+                <div className="col-1">
+                  <p>Views:</p>
                 </div>
+                <div className="col-2"></div>
               </div>
 
               <div className="list-chapter">
-                {manga.chapters.map((chapter, index) => (
-                  <div
-                    className="row"
-                    key={chapter.id}
-                    style={{
-                      borderBottom: '1px solid lightgrey',
-                    }}
-                  >
-                    <Link
-                      href={`/chapter/${chapter.id}`}
-                      passHref
+                {manga.chapters
+                  .filter(
+                    (chapter) =>
+                      !isFilterByUser ||
+                      chapter.userPosted.id == userInfo.id
+                  )
+                  .map((chapter, index) => (
+                    <div
+                      className="row"
+                      key={chapter.id}
+                      style={{
+                        borderBottom: '1px solid lightgrey',
+                      }}
                     >
+                      <Link
+                        href={`/chapter/${chapter.id}`}
+                        passHref
+                      >
+                        <div className="col-4">
+                          <p
+                            className={styles.object}
+                            onClick={() => {
+                              addToHistory(
+                                bookGroupId,
+                                chapter,
+                                manga
+                              );
+                            }}
+                          >
+                            Chapter
+                            {' ' +
+                              chapter.chapterNumber +
+                              ': ' +
+                              (chapter.name
+                                ? chapter.name
+                                : '')}
+                          </p>
+                        </div>
+                      </Link>
+
                       <div className="col-2">
-                        <p
-                          className={styles.object}
-                          onClick={() => {
-                            addToHistory(
-                              bookGroupId,
-                              chapter,
-                              manga
-                            );
-                          }}
-                        >
-                          Chapter
-                          {' ' + chapter.chapterNumber}
+                        <p>
+                          <RelativeTimestamp>
+                            {chapter.timePosted}
+                          </RelativeTimestamp>
                         </p>
                       </div>
-                    </Link>
-                    <div className="col-3">
-                      <p> {chapter.name && chapter.name}</p>
-                    </div>
-                    <div className="col-2">
-                      <p>
-                        <RelativeTimestamp>
-                          {chapter.timePosted}
-                        </RelativeTimestamp>
-                      </p>
-                    </div>
-                    <Link
-                      href={`/user/${chapter.userPosted.id}`}
-                      passHref
-                    >
-                      <div className="col-3">
-                        <p className={styles.object}>
-                          {chapter.userPosted.name}
+                      <Link
+                        href={`/user/${chapter.userPosted.id}`}
+                        passHref
+                      >
+                        <div className="col-3">
+                          <p className={styles.object}>
+                            {chapter.userPosted.name}
+                          </p>
+                        </div>
+                      </Link>
+                      <div className="col-1">
+                        <p>
+                          {chapter.views
+                            ? chapter.views
+                            : '0'}
                         </p>
                       </div>
-                    </Link>
-                    <div className="col-2">
-                      <p>
-                        {chapter.views
-                          ? chapter.views
-                          : 'Chưa có lượt xem'}
-                      </p>
+                      <div className="col-2">
+                        <div className="d-flex">
+                          {userInfo.permission &&
+                          userInfo.permission.includes(
+                            'chapter.modifySelf'
+                          ) &&
+                          userInfo.id ==
+                            chapter.userPosted.id ? (
+                            <Link
+                              href={
+                                '/edit-Chapter/' +
+                                chapter.id
+                              }
+                              passHref
+                            >
+                              <button className="btn btn-dark me-2">
+                                <FaEdit></FaEdit>
+                              </button>
+                            </Link>
+                          ) : (
+                            userInfo.permission &&
+                            userInfo.permission.includes(
+                              'chapter.modify'
+                            ) && (
+                              <Link
+                                href={
+                                  '/edit-Chapter/' +
+                                  chapter.id
+                                }
+                                passHref
+                              >
+                                <button className="btn btn-dark me-2">
+                                  <FaEdit></FaEdit>
+                                </button>
+                              </Link>
+                            )
+                          )}
+                          {userInfo.permission &&
+                          userInfo.permission.includes(
+                            'chapter.deleteSelf'
+                          ) &&
+                          userInfo.id ==
+                            chapter.userPosted.id ? (
+                            <button
+                              className="btn btn-danger"
+                              onClick={() =>
+                                deleteChapter(chapter.id)
+                              }
+                            >
+                              <FaWindowClose></FaWindowClose>
+                            </button>
+                          ) : (
+                            userInfo.permission &&
+                            userInfo.permission.includes(
+                              'chapter.delete'
+                            ) && (
+                              <button
+                                className="btn btn-danger"
+                                onClick={() =>
+                                  deleteChapter(chapter.id)
+                                }
+                              >
+                                <FaWindowClose></FaWindowClose>
+                              </button>
+                            )
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
-                {console.log(userInfo)}
+                  ))}
                 {userInfo.permission &&
                   userInfo.permission.includes(
                     'chapter.post'
@@ -718,7 +1040,7 @@ export default function Details({
                     >
                       <div className="d-flex justify-content-end  mt-3">
                         <button className="btn btn-dark ">
-                          Upload truyện
+                          Upload chapter mới
                         </button>
                       </div>
                     </Link>
@@ -829,55 +1151,60 @@ export default function Details({
           <div className="comment-section mt-3">
             {Object.keys(userInfo).length !== 0 ? (
               <div
-                className="row p-3 m-2"
+                className="row p-3 mb-2 ms-1"
                 style={{
-                  background: 'lightgrey',
+                  background: '#b2bec3',
                   borderRadius: '0.75rem',
                 }}
               >
-                <div
-                  className="col-lg-2 col-6"
-                  style={{
-                    width: '80px',
-                    aspectRatio: '1/1',
-                    overflow: 'hidden',
-                    borderRadius: '50%',
-                    position: 'relative',
-                  }}
-                >
-                  <Image
-                    src={
-                      userInfo.avatar
-                        ? `${server}/image/${userInfo.avatar}`
-                        : NULL_CONSTANTS.AVATAR
-                    }
-                    width={50}
-                    height={50}
-                    objectFit="cover"
-                    alt="Avatar"
-                    layout="fill"
-                  ></Image>
-                </div>
-                <div className="col-lg-10 col-6">
-                  <textarea
-                    name="comments"
-                    id=""
-                    rows="3"
-                    className="form-control"
-                    placeholder="Nhập bình luận..."
-                    value={comment}
-                    onChange={(e) =>
-                      setComment(e.target.value)
-                    }
-                  ></textarea>
-                </div>
-                <div className="d-flex justify-content-end mt-3">
-                  <button
-                    className="btn btn-dark me-5"
-                    onClick={() => submit(comment)}
+                <div className="col-lg-2 col-3">
+                  <div
+                    style={{
+                      width: '80%',
+                      aspectRatio: '1/1',
+                      overflow: 'hidden',
+                      borderRadius: '50%',
+                      position: 'relative',
+                    }}
                   >
-                    Bình luận
-                  </button>
+                    <Image
+                      src={
+                        userInfo.avatar
+                          ? `${server}/image/${userInfo.avatar}`
+                          : NULL_CONSTANTS.AVATAR
+                      }
+                      objectFit="cover"
+                      alt="Avatar"
+                      layout="fill"
+                    ></Image>
+                  </div>
+                </div>
+                <div className="col-lg-10 col-9">
+                  <textarea
+                    type="text"
+                    rows={3}
+                    className="form-control"
+                    name="comment"
+                    placeholder="Bình luận phải có độ dài từ 10 tới 500 ký tự"
+                    onChange={(e) =>
+                      handleInputChange(e.target.value)
+                    }
+                    value={comment}
+                  ></textarea>
+
+                  <div className="d-flex justify-content-end mt-3">
+                    <button
+                      type="submit"
+                      disabled={
+                        comment.length < 10 ||
+                        comment.length > 500
+                      }
+                      className="btn btn-dark "
+                      onClick={() => submit(comment)}
+                    >
+                      Submit
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : (
@@ -888,30 +1215,29 @@ export default function Details({
                   borderRadius: '0.75rem',
                 }}
               >
-                <div
-                  className="col-lg-2 col-6"
-                  style={{
-                    width: '80px',
-                    aspectRatio: '1/1',
-                    overflow: 'hidden',
-                    borderRadius: '50%',
-                    position: 'relative',
-                  }}
-                >
-                  <Image
-                    src={
-                      userInfo.avatar
-                        ? `${server}/image/${userInfo.avatar}`
-                        : NULL_CONSTANTS.AVATAR
-                    }
-                    width={50}
-                    height={50}
-                    objectFit="cover"
-                    alt="Avatar"
-                    layout="fill"
-                  ></Image>
+                <div className="col-lg-2 col-3">
+                  <div
+                    style={{
+                      width: '80%',
+                      aspectRatio: '1/1',
+                      overflow: 'hidden',
+                      borderRadius: '50%',
+                      position: 'relative',
+                    }}
+                  >
+                    <Image
+                      src={
+                        userInfo.avatar
+                          ? `${server}/image/${userInfo.avatar}`
+                          : NULL_CONSTANTS.AVATAR
+                      }
+                      objectFit="cover"
+                      alt="Avatar"
+                      layout="fill"
+                    ></Image>
+                  </div>
                 </div>
-                <div className="col-lg-10 col-6">
+                <div className="col-lg-10 col-9">
                   <textarea
                     name="comments"
                     id=""
@@ -989,6 +1315,42 @@ export default function Details({
           ))}
         </div>
       </div>
+      <div className="modal fade" id="deleteModal">
+        <div className="modal-dialog">
+          <div className="modal-content">
+            <div className="modal-header">
+              <h4 className="modal-title">
+                Bạn có muốn xoá không?
+              </h4>
+              <button
+                type="button"
+                className="btn-close"
+                data-bs-dismiss="modal"
+              ></button>
+            </div>
+
+            <div className="modal-body d-flex justify-content-around">
+              <button
+                type="button"
+                className="btn btn-dark"
+                onClick={() => deleteBookGroup()}
+                data-bs-dismiss="modal"
+              >
+                Có
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                data-bs-dismiss="modal"
+              >
+                Không
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <ScrollButton></ScrollButton>
     </div>
   );
 }

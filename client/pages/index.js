@@ -1,5 +1,3 @@
-import Head from 'next/head';
-
 import Link from 'next/link';
 import { useContext } from 'react';
 import { MangaContext } from '../context/manga-Context';
@@ -14,11 +12,9 @@ import ByMonth from '../components/ranking-In-Manga-Page/by-Month';
 import '../public/images/null-Book.png';
 import { useRouter } from 'next/router';
 import Image from 'next/image';
-import RelativeTimestamp from '../utilities/to-Relative-Time-stamp';
-import {
-  FaArrowCircleRight,
-  FaArrowRight,
-} from 'react-icons/fa';
+import { FaArrowRight } from 'react-icons/fa';
+import ScrollButton from '../utilities/scrollButton';
+
 export default function Home() {
   const {
     latestManga,
@@ -144,7 +140,7 @@ export default function Home() {
             </h5>
             <div className="row">
               {randomBooks
-                .slice(0, 10)
+                .slice(2, 10)
                 .map((randomBook) => (
                   <Link
                     href={`manga/${randomBook.id}`}
@@ -163,17 +159,21 @@ export default function Home() {
                                 ? `${server}/image/${randomBook.image}`
                                 : NULL_CONSTANTS.BOOK_GROUP_IMAGE
                             }
-                            text={`${randomBook.likes} lượt thích`}
+                            text={
+                              randomBook.likes > 0
+                                ? `${randomBook.likes} lượt thích`
+                                : `0 lượt thích`
+                            }
                             bgColor="#ff7043"
                           ></DisplayImg>
                         </div>
                         <div className="col-6 mt-2">
-                          <p
+                          <h5
                             style={{ color: '#ff7043' }}
                             className={styles.object}
                           >
                             {randomBook.title}
-                          </p>
+                          </h5>
                           <p>{randomBook.views} lượt đọc</p>
                           <div className="list-chapter">
                             <p className="border-bottom">
@@ -182,8 +182,7 @@ export default function Home() {
                             <div>
                               <Link
                                 href={
-                                  '/chapter/' +
-                                  randomBook.latestChapter
+                                  '/manga/' + randomBook.id
                                 }
                                 passHref
                               >
@@ -378,7 +377,7 @@ export default function Home() {
                                   style={{
                                     color: '#bdc3c7',
                                   }}
-                                >{`Đọc tiếp chapter ${book.chapterId}`}</p>
+                                >{`Đọc tiếp chapter ${book.latestChapter}`}</p>
                               </Link>
                             </div>
                           </div>
@@ -418,6 +417,7 @@ export default function Home() {
                       border: '1px solid lightgray',
                     }}
                   >
+                    {console.log(favoriteBooks)}
                     {favoriteBooks &&
                       favoriteBooks
                         .slice(0, 5)
@@ -474,7 +474,8 @@ export default function Home() {
                                   }}
                                 >
                                   {'Chap mới nhất: ' +
-                                    book.latestChapter.id}
+                                    book.latestChapter
+                                      .chapterNumber}
                                 </p>
                               )}
                             </div>
@@ -530,45 +531,51 @@ export default function Home() {
                         </p>
                       </Link>
                     </div>
-                    <div className="d-flex  p-2">
-                      <div
-                        style={{
-                          position: 'relative',
-                          overflow: 'hidden',
-                          borderRadius: '0.75rem',
-                          width: '80px',
-                          aspectRatio: '1/1',
-                        }}
-                      >
-                        <Link
-                          href={'/user/' + comment.userId}
-                          passHref
+                    <div className="row">
+                      <div className="col-3">
+                        <div
+                          style={{
+                            borderRadius: '0.75rem',
+                            width: '80%',
+                            aspectRatio: '1/1',
+                            position: 'relative',
+                            overflow: 'hidden',
+                          }}
                         >
-                          <Image
-                            src={
-                              comment.userAvatar
-                                ? `${server}/image/${comment.userAvatar}`
-                                : NULL_CONSTANTS.AVATAR
-                            }
-                            alt="Describe"
-                            objectFit="cover"
-                            layout="fill"
-                          ></Image>
-                        </Link>
-                      </div>
-                      <div className="ms-4 d-flex flex-column justify-content-between">
-                        <Link
-                          href={'/user/' + comment.userId}
-                          passHref
-                        >
-                          <h5
-                            className={styles.object}
-                            style={{ color: '#e74c3c' }}
+                          <Link
+                            href={'/user/' + comment.userId}
+                            passHref
                           >
-                            {comment.userName}
-                          </h5>
-                        </Link>
-                        <p>{comment.comment}</p>
+                            <Image
+                              src={
+                                comment.userAvatar
+                                  ? `${server}/image/${comment.userAvatar}`
+                                  : NULL_CONSTANTS.AVATAR
+                              }
+                              alt="Describe"
+                              objectFit="cover"
+                              layout="fill"
+                            ></Image>
+                          </Link>
+                        </div>
+                      </div>
+                      <div className="col-9">
+                        <div className="d-flex flex-column justify-content-between">
+                          <Link
+                            href={'/user/' + comment.userId}
+                            passHref
+                          >
+                            <p
+                              className={styles.object}
+                              style={{ color: '#e74c3c' }}
+                            >
+                              {comment.userName}
+                            </p>
+                          </Link>
+                          <p className="text-break">
+                            {comment.comment}
+                          </p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -577,6 +584,7 @@ export default function Home() {
           </div>
         </div>
       </div>
+      <ScrollButton></ScrollButton>
     </div>
   );
 }

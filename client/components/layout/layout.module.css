@@ -1,5 +1,6 @@
 .genreContainer {
-  width: 500px;
+  width: 40rem;
+  border-radius: 0.75rem;
 }
 .item {
   padding: 0.5rem;
@@ -7,8 +8,13 @@
 .item:hover {
   cursor: pointer;
   color: #2ecc71 !important;
+  background: #ecf0f1;
+  border-radius: 0.75rem;
+  padding: 0.5rem;
 }
-
+.differentitem:hover {
+  cursor: pointer;
+}
 @media screen and (max-width: 560px) {
   .genreContainer {
     width: 100%;
